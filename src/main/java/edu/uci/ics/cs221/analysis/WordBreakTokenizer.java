@@ -3,7 +3,7 @@ package edu.uci.ics.cs221.analysis;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
+import java.util.*;
 
 /**
  * Project 1, task 2: Implement a Dynamic-Programming based Word-Break Tokenizer.
@@ -34,19 +34,107 @@ import java.util.List;
  */
 public class WordBreakTokenizer implements Tokenizer {
 
+    public HashMap hm = new HashMap();
+    public static Set<String> punctuations = new HashSet<>();
+    static {
+        punctuations.addAll(Arrays.asList(",", ".", ";", "?", "!"));
+    }
+
     public WordBreakTokenizer() {
         try {
             // load the dictionary corpus
             URL dictResource = WordBreakTokenizer.class.getClassLoader().getResource("cs221_frequency_dictionary_en.txt");
             List<String> dictLines = Files.readAllLines(Paths.get(dictResource.toURI()));
-
+            for (String dict : dictLines){
+                List<String> WordsFreq = Arrays.asList(dict.toLowerCase().split(" "));
+                // Hack to deal with the invisible char at the beginning of the file
+                // Related Slack message is at https://uci-cs221-s19.slack.com/archives/CHM5W2K6G/p1554440079005900
+                if (WordsFreq.get(0).startsWith("\uFEFF")){
+                    WordsFreq.set(0, WordsFreq.get(0).substring(1));
+                }
+                hm.put(WordsFreq.get(0), Long.parseLong(WordsFreq.get(1)));
+            }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        //System.out.println(hm.get("the"));
     }
 
     public List<String> tokenize(String text) {
-        throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
+        if (text.length()==0)
+            return new ArrayList<>();
+        for (String str: punctuations){
+            if (text.contains(str))
+                throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
+        }
+        int length = text.length();
+        String lowerText = text.toLowerCase();
+        Boolean[][] D = new Boolean[length][length];
+        List<List<String>> result = new ArrayList<>();
+        List<String> path = new ArrayList<>();
+        for (int l = 1; l <= length; l++){
+            for (int i = 0; i <= length-l; i++){
+                int j = i+l-1;
+                D[i][j] = false;
+                String subs = lowerText.substring(i, j+1);
+                if (hm.containsKey(subs))
+                    D[i][j] = true;
+                else {
+                    for (int k = i; k <= j-1; k++){
+                        if (D[i][k] && D[k+1][j])
+                            D[i][j] = true;
+                    }
+                }
+            }
+        }
+        if ( !D[0][length-1] )
+            throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
+        wordBreakResult(lowerText, hm, 0, D, path, result);
+        System.out.println(result);
+        List<String> finalResult = FinalResult(result, hm);
+        finalResult.removeAll(StopWords.stopWords);
+        return finalResult;
+    }
+
+    public void wordBreakResult(String text, HashMap hm, int start, Boolean[][]D, List<String> path, List<List<String>> result){
+        int length = text.length();
+        if (start == length){
+            List<String> path1 = new ArrayList<>(path);
+            result.add(path1);
+            return;
+        }
+        if (!D[start][length-1]){
+            return;
+        }
+        for (int j = start; j < text.length(); j++){
+            String token = text.substring(start, j+1);
+            if (!hm.containsKey(token)){
+                continue;
+            }
+            path.add(token);
+            wordBreakResult(text, hm, j+1, D, path, result);
+            path.remove(path.size()-1);
+        }
+    }
+
+    public List<String> FinalResult(List<List<String>> result, HashMap hm){
+        List<Double> Prob = new ArrayList<>();
+        for (List<String> li: result){
+            Long freq = 0L;
+            Double prob = 1.0;
+            for (String token: li){
+                Long tok = (Long) hm.get(token);
+                freq = freq + tok;
+            }
+            for (String token: li){
+                Long tok = (Long) hm.get(token);
+                prob = prob * (tok*1.0 / freq);
+            }
+            Prob.add(prob);
+        }
+        Double max = Collections.max(Prob);
+        System.out.println(result.get(Prob.indexOf(max)));
+        return result.get(Prob.indexOf(max));
     }
 
 }
