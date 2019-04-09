@@ -36,6 +36,7 @@ public class WordBreakTokenizer implements Tokenizer {
 
     public HashMap hm = new HashMap();
     public static Set<String> punctuations = new HashSet<>();
+    private Double totalProb = 0.0;
     static {
         punctuations.addAll(Arrays.asList(",", ".", ";", "?", "!"));
     }
@@ -52,6 +53,7 @@ public class WordBreakTokenizer implements Tokenizer {
                 if (WordsFreq.get(0).startsWith("\uFEFF")){
                     WordsFreq.set(0, WordsFreq.get(0).substring(1));
                 }
+                totalProb += Long.parseLong(WordsFreq.get(1));
                 hm.put(WordsFreq.get(0), Long.parseLong(WordsFreq.get(1)));
             }
         } catch (Exception e) {
@@ -91,7 +93,7 @@ public class WordBreakTokenizer implements Tokenizer {
             throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
         wordBreakResult(lowerText, hm, 0, D, path, result);
         System.out.println(result);
-        List<String> finalResult = FinalResult(result, hm);
+        List<String> finalResult = FinalResult(result, hm, totalProb);
         finalResult.removeAll(StopWords.stopWords);
         return finalResult;
     }
@@ -117,18 +119,13 @@ public class WordBreakTokenizer implements Tokenizer {
         }
     }
 
-    public List<String> FinalResult(List<List<String>> result, HashMap hm){
+    public List<String> FinalResult(List<List<String>> result, HashMap hm, Double probs){
         List<Double> Prob = new ArrayList<>();
         for (List<String> li: result){
-            Long freq = 0L;
             Double prob = 1.0;
             for (String token: li){
                 Long tok = (Long) hm.get(token);
-                freq = freq + tok;
-            }
-            for (String token: li){
-                Long tok = (Long) hm.get(token);
-                prob = prob * (tok*1.0 / freq);
+                prob = prob * (tok*1.0 / probs);
             }
             Prob.add(prob);
         }
